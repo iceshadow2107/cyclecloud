@@ -1,0 +1,37 @@
+import requests
+
+response = requests.get('https://www.twse.com.tw/exchangeReport/MI_INDEX?response=csv&date=20200401&type=ALLBUT0999&_=1586085859534')
+lines = response.text.split('\n')
+lines[300]
+newlines = []
+
+for line in lines:
+    if len(line.split('",')) == 17:
+        newlines.append(line)
+newlines[300]
+import pandas as pd
+from io import StringIO
+df = pd.read_csv(StringIO("\n".join(newlines).replace('=', '')))
+
+df = df.astype(str)
+
+df = df.apply(lambda s: s.str.replace(',', ''))
+
+df = df.set_index('證券代號')
+
+df = df.apply(lambda s: pd.to_numeric(s, errors = 'coerce'))
+
+df = df[df.columns[df.isnull().sum() != len(df)]]
+
+df[df['收盤價']/df['開盤價'] > 1.05]
+
+df.to_csv('daily_price.csv', encoding = 'utf_8_sig')
+df = pd.read_csv('daily_price.csv', index_col = ['證券代號'],)
+df = df.loc[~df['收盤價'].isnull()]
+df.head()
+
+import sqlite3
+conn = sqlite3.connect('test.sqlite3')
+df.to_sql('daily_price', conn, if_exists = 'replace')
+df = pd.read_sql('select * from daily_price', conn, index_col = ['證券代號'])
+df.head()
